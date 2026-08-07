@@ -6,4 +6,4 @@
 - Behoud handmatige invoer als fallback wanneer de openbare Mijn Korfbal API niet beschikbaar is of geen team toont.
 - Voeg foutafhandeling toe voor netwerkproblemen, HTTP-fouten, lege lijsten en ongeldige API-antwoorden.
 - Behoud Sportlink Client ID-ondersteuning, bestaande configuratievelden en unieke team-ID's.
-- Voeg geautomatiseerde GitHub Releases toe voor matching `vX.Y.Z` tags.
+- Voeg geautomatiseerde GitHub Releases toe na geslaagde `main`-updates en voor matching `vX.Y.Z` tags.

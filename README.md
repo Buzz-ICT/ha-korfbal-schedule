@@ -233,7 +233,7 @@ Beide codes zijn zichtbaar in de URL van je teampagina.
 - Handmatige invoer behouden als fallback voor storingen en ontbrekende teams.
 - Duidelijke foutafhandeling toegevoegd voor de openbare discovery-API.
 - Sportlink Client ID, bestaande configuratievelden en unieke team-ID's behouden.
-- GitHub Release-automatisering toegevoegd voor versie-tags.
+- GitHub Release-automatisering toegevoegd voor geslaagde `main`-updates en versie-tags.
 
 ## Releaseprocedure
 
@@ -244,11 +244,11 @@ hierboven. Voor versie `1.1.0`:
 1. Verhoog de manifestversie en voeg release notes toe aan `changes.md`.
 2. Werk de `v1.1.0`-sectie in deze README bij.
 3. Voer de lokale validatie uit en commit/push naar `main`.
-4. Push de tag `v1.1.0`.
 
-Een push naar `main` voert de validatie uit. Bij een push van een versie-tag
-controleert de GitHub Actions-workflow de tag tegen de manifestversie, gebruikt
-de bijbehorende sectie uit `changes.md` en maakt een release met de titel
-`Korfbal Schedule v1.1.0`. Als Actions niet beschikbaar is, maak je dezelfde
-tag en GitHub Release handmatig aan en gebruik je de matching sectie uit
-`changes.md` als release notes.
+Een succesvolle push naar `main` voert de validatie uit, gebruikt de manifest-
+versie als release-tag, haalt de bijbehorende sectie uit `changes.md` en maakt
+of actualiseert de release met de titel `Korfbal Schedule v1.1.0`. Een aparte
+tag push is dus niet nodig. Bij een expliciete versie-tag controleert de
+workflow de tag tegen de manifestversie en maakt of actualiseert dezelfde
+release. Als Actions niet beschikbaar is, maak je de release handmatig aan
+met de matching sectie uit `changes.md` als release notes.
