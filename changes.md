@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.1 - 2026-08-07
+
+- Herstel de overgang van clubkeuze naar de teamkeuze in de browsebare setup.
+- Accepteer zowel stabiele codes als zichtbare labels bij club- en teamselectie.
+- Behoud de stabiele club- en teamcodes in nieuwe configuratie-items.
+
 ## v1.1.0 - 2026-08-07
 
 - Voeg browsebare club- en teamselectie toe tijdens het instellen van de integratie.

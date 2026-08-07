@@ -67,21 +67,36 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Select a club and load its teams."""
         if user_input is not None:
             club_code = str(user_input.get(CONF_CLUB_CODE, "")).strip()
-            if not any(club.code == club_code for club in self._clubs):
+            selected_club = next(
+                (
+                    club
+                    for club in self._clubs
+                    if club.code == club_code or club.label == club_code
+                ),
+                None,
+            )
+            if selected_club is None:
                 return self._show_browse_form("invalid_selection")
 
-            self._selected_club_code = club_code
+            self._selected_club_code = selected_club.code
             try:
-                self._teams = await async_fetch_teams(self.hass, club_code)
+                self._teams = await async_fetch_teams(
+                    self.hass, self._selected_club_code
+                )
             except DiscoveryEmptyError:
                 return self._show_browse_form("no_teams")
             except DiscoveryError as err:
                 _LOGGER.warning(
-                    "Could not discover teams for club %s: %s", club_code, err
+                    "Could not discover teams for club %s: %s",
+                    self._selected_club_code,
+                    err,
                 )
                 return self._show_browse_form(_discovery_error_key(err))
             except Exception:
-                _LOGGER.exception("Unexpected error discovering teams for club %s", club_code)
+                _LOGGER.exception(
+                    "Unexpected error discovering teams for club %s",
+                    self._selected_club_code,
+                )
                 return self._show_browse_form("unknown")
 
             return await self.async_step_team()
@@ -110,7 +125,12 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             team_code = str(user_input.get(CONF_TEAM_CODE, "")).strip()
             selected_team = next(
-                (team for team in self._teams if team.code == team_code), None
+                (
+                    team
+                    for team in self._teams
+                    if team.code == team_code or team.label == team_code
+                ),
+                None,
             )
             if selected_team is None:
                 return self._show_team_form("invalid_selection")
@@ -235,9 +255,26 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
+class _LabelCompatibleSelectSelector(SelectSelector):
+    """Select selector that also accepts an option's displayed label."""
+
+    def __call__(self, data: object) -> object:
+        """Validate a code or its displayed label."""
+        try:
+            return super().__call__(data)
+        except vol.Invalid:
+            if isinstance(data, str) and any(
+                option.get("label") == data
+                for option in self.config["options"]
+                if isinstance(option, dict)
+            ):
+                return data
+            raise
+
+
 def _select_selector(options: list[dict[str, str]]) -> SelectSelector:
     """Create a compact dropdown selector with stable submitted values."""
-    return SelectSelector(
+    return _LabelCompatibleSelectSelector(
         SelectSelectorConfig(
             options=options,
             mode=SelectSelectorMode.DROPDOWN,

@@ -73,6 +73,46 @@ async def test_browse_flow_preserves_selected_ids_and_custom_name(
 
 
 @pytest.mark.usefixtures("enable_custom_integrations")
+async def test_browse_flow_accepts_display_labels(hass, monkeypatch) -> None:
+    """Display labels from older frontend clients resolve to stable IDs."""
+    monkeypatch.setattr(
+        config_flow,
+        "async_fetch_clubs",
+        AsyncMock(return_value=[ClubOption("C1", "Club One", "Club One")]),
+    )
+    monkeypatch.setattr(
+        config_flow,
+        "async_fetch_teams",
+        AsyncMock(return_value=[TeamOption("T1", "Team One", "Team One")]),
+    )
+
+    menu_result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+    )
+    browse_result = await _select_menu(hass, menu_result, "browse")
+    team_result = await hass.config_entries.flow.async_configure(
+        browse_result["flow_id"], {"club_code": "Club One"}
+    )
+    team_selector = next(iter(team_result["data_schema"].schema.values()))
+
+    assert team_result["type"] is FlowResultType.FORM
+    assert team_result["step_id"] == "team"
+    assert team_result["errors"] == {}
+    assert team_selector.config["options"] == [
+        {"value": "T1", "label": "Team One"}
+    ]
+
+    settings_result = await hass.config_entries.flow.async_configure(
+        team_result["flow_id"], {"team_code": "Team One"}
+    )
+
+    assert settings_result["type"] is FlowResultType.FORM
+    assert settings_result["step_id"] == "settings"
+    assert config_flow.async_fetch_teams.await_args.args[1] == "C1"
+
+
+@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_manual_flow_keeps_legacy_data_shape(hass) -> None:
     """Manual setup remains available and stores the legacy fields."""
     menu_result = await hass.config_entries.flow.async_init(

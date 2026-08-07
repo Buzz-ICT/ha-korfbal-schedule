@@ -227,6 +227,12 @@ Beide codes zijn zichtbaar in de URL van je teampagina.
 
 ## Changelog
 
+### v1.1.1
+
+- Club- en teamkeuze in de browsebare setup hersteld.
+- Selectie accepteert zowel de stabiele codes als de zichtbare labels van clubs en teams.
+- De stabiele club- en teamcodes blijven opgeslagen in configuratie-items.
+
 ### v1.1.0
 
 - Browsebare club- en teamselectie toegevoegd aan de setup.
@@ -239,15 +245,15 @@ Beide codes zijn zichtbaar in de URL van je teampagina.
 
 De versie in `custom_components/korfbal_schedule/manifest.json` is leidend.
 Houd die versie gelijk aan de bovenste versie in `changes.md` en de changelog
-hierboven. Voor versie `1.1.0`:
+hierboven. Voor versie `1.1.1`:
 
 1. Verhoog de manifestversie en voeg release notes toe aan `changes.md`.
-2. Werk de `v1.1.0`-sectie in deze README bij.
+2. Werk de `v1.1.1`-sectie in deze README bij.
 3. Voer de lokale validatie uit en commit/push naar `main`.
 
 Een succesvolle push naar `main` voert de validatie uit, gebruikt de manifest-
 versie als release-tag, haalt de bijbehorende sectie uit `changes.md` en maakt
-of actualiseert de release met de titel `Korfbal Schedule v1.1.0`. Een aparte
+of actualiseert de release met de titel `Korfbal Schedule v1.1.1`. Een aparte
 tag push is dus niet nodig. Bij een expliciete versie-tag controleert de
 workflow de tag tegen de manifestversie en maakt of actualiseert dezelfde
 release. Als Actions niet beschikbaar is, maak je de release handmatig aan
