@@ -1,11 +1,11 @@
 {
   "domain": "korfbal_schedule",
   "name": "Korfbal Schedule",
-  "documentation": "https://github.com/yourusername/korfbal-ha",
+  "documentation": "https://github.com/buzzict/ha-korfbal-schedule",
   "requirements": [],
   "dependencies": [],
   "codeowners": [],
-  "version": "1.0.0",
+  "version": "1.1.0",
   "iot_class": "cloud_polling",
   "config_flow": true
 }

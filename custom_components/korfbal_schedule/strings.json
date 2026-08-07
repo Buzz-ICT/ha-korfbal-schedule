@@ -3,7 +3,37 @@
     "step": {
       "user": {
         "title": "Korfbal Schedule instellen",
-        "description": "Voer de team- en clubcode in. Deze vind je in de URL op mijn.korfbal.nl.\nVoorbeeld URL: https://mijn.korfbal.nl/team/details/NCX35C2/T1200100098/programma",
+        "description": "Kies hoe je de club en het team wilt instellen.",
+        "menu_options": {
+          "browse": "Club en team zoeken",
+          "manual": "Codes handmatig invoeren"
+        }
+      },
+      "browse": {
+        "title": "Club zoeken",
+        "description": "Kies een club uit de openbare lijst. Bij problemen kun je teruggaan en de codes handmatig invoeren. Voorbeeld URL: {url}",
+        "data": {
+          "club_code": "Club"
+        }
+      },
+      "team": {
+        "title": "Team kiezen",
+        "description": "Kies een team van de geselecteerde club.",
+        "data": {
+          "team_code": "Team"
+        }
+      },
+      "settings": {
+        "title": "Instellingen",
+        "description": "Pas eventueel de weergavenaam aan. Laat Sportlink leeg om de openbare Mijn Korfbal API te gebruiken.",
+        "data": {
+          "team_name": "Teamnaam (voor weergave)",
+          "sportlink_client_id": "Sportlink Client ID (optioneel, voor officiële API)"
+        }
+      },
+      "manual": {
+        "title": "Codes handmatig invoeren",
+        "description": "Voer de club- en teamcode in. Je vindt deze in de URL van de teampagina op mijn.korfbal.nl. Voorbeeld URL: {url}",
         "data": {
           "club_code": "Clubcode (bijv. NCX35C2)",
           "team_code": "Teamcode (bijv. T1200100098)",
@@ -13,7 +43,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Kan geen verbinding maken met mijn.korfbal.nl",
+      "cannot_connect": "Kan geen verbinding maken met de Mijn Korfbal API. Probeer opnieuw of kies Codes handmatig invoeren.",
+      "api_error": "De Mijn Korfbal API gaf een fout. Probeer opnieuw of kies Codes handmatig invoeren.",
+      "invalid_response": "De Mijn Korfbal API gaf een ongeldig antwoord. Probeer opnieuw of kies Codes handmatig invoeren.",
+      "no_clubs": "Er zijn geen clubs gevonden. Kies Codes handmatig invoeren.",
+      "no_teams": "Er zijn geen teams gevonden voor deze club. Kies Codes handmatig invoeren.",
+      "invalid_selection": "De gekozen optie is niet meer beschikbaar. Open de lijst opnieuw.",
       "unknown": "Onbekende fout"
     },
     "abort": {

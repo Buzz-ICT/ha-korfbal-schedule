@@ -25,6 +25,7 @@ Kopieer de map `korfbal_schedule` naar je Home Assistant configuratiemap:
 /config/custom_components/korfbal_schedule/
 ├── __init__.py
 ├── calendar.py
+├── api.py
 ├── config_flow.py
 ├── coordinator.py
 ├── manifest.json
@@ -48,15 +49,35 @@ Instellingen → Systeem → Herstart
 
 1. Ga naar **Instellingen → Apparaten & Diensten → Integratie toevoegen**
 2. Zoek op **Korfbal Schedule**
-3. Vul in:
-   - **Clubcode**: `NCX35C2`  ← uit jouw URL
-   - **Teamcode**: `T1200100098`  ← uit jouw URL
-   - **Teamnaam**: bijv. `Heren 1`
-   - **Sportlink Client ID**: *(zie hieronder, optioneel)*
+3. Kies **Club en team zoeken** en selecteer eerst je club en daarna je team.
+4. Controleer de teamnaam en vul eventueel een **Sportlink Client ID** in.
+
+Werkt de openbare lijst niet, kies dan **Codes handmatig invoeren**. Vul de
+clubcode en teamcode uit de URL van je teampagina in. De handmatige route blijft
+ook beschikbaar voor teams die niet in de openbare lijst staan.
 
 ---
 
 ## Gegevensbronnen — twee strategieën
+
+### Club- en teamselectie tijdens het instellen
+
+De browsebare setup gebruikt twee openbare endpoints van de Mijn Korfbal-website:
+
+```
+GET https://api-mijn.korfbal.nl/api/v2/clubs
+GET https://api-mijn.korfbal.nl/api/v2/clubs/{clubCode}/teams
+```
+
+De clublijst is alfabetisch gegroepeerd en teams zijn per leeftijdsgroep
+gegroepeerd. De integratie toont leesbare labels, maar slaat de stabiele
+`ref_id`-waarden op als `club_code` en `team_code`.
+
+Deze endpoints zijn website-API's zonder gegarandeerde beschikbaarheid of
+compatibiliteitsbelofte. Een wijziging, lege lijst of tijdelijke storing kan de
+club- of teamkeuze verhinderen; gebruik dan de handmatige route. Bestaande
+configuratie-items blijven werken omdat hun opgeslagen velden en unieke ID niet
+veranderen.
 
 ### Strategie A: Mijn Korfbal REST API (standaard, geen API key nodig)
 
@@ -179,6 +200,7 @@ Handmatig vernieuwen: **Instellingen → Apparaten & Diensten → Korfbal Schedu
 | Probleem | Oplossing |
 |---------|-----------|
 | Geen wedstrijden zichtbaar na reload | Doe een **volledige HA herstart** — reload herlaadt geen Python-bestanden. |
+| Club- of teamlijst kan niet worden geladen | Controleer de verbinding met `api-mijn.korfbal.nl` of kies **Codes handmatig invoeren**. |
 | Foutmelding in logs over club/team | Controleer clubcode en teamcode in de URL van jouw teampagina op mijn.korfbal.nl. |
 | `UpdateFailed` in logs | Netwerk probleem of API wijziging. Controleer HA logs via `Instellingen → Systeem → Logboek`. |
 | Kalender leeg, sensoren op `unknown` | Zie logs op `korfbal` — de integratie logt nu altijd een fout als ophalen mislukt. |
@@ -202,3 +224,30 @@ https://mijn.korfbal.nl/team/details/{CLUB_CODE}/{TEAM_CODE}/programma
 ```
 
 Beide codes zijn zichtbaar in de URL van je teampagina.
+
+## Changelog
+
+### v1.1.0
+
+- Browsebare club- en teamselectie toegevoegd aan de setup.
+- Handmatige invoer behouden als fallback voor storingen en ontbrekende teams.
+- Duidelijke foutafhandeling toegevoegd voor de openbare discovery-API.
+- Sportlink Client ID, bestaande configuratievelden en unieke team-ID's behouden.
+- GitHub Release-automatisering toegevoegd voor versie-tags.
+
+## Releaseprocedure
+
+De versie in `custom_components/korfbal_schedule/manifest.json` is leidend.
+Houd die versie gelijk aan de bovenste versie in `changes.md` en de changelog
+hierboven. Voor versie `1.1.0`:
+
+1. Verhoog de manifestversie en voeg release notes toe aan `changes.md`.
+2. Werk de `v1.1.0`-sectie in deze README bij.
+3. Voer de lokale validatie uit en commit/push naar `main`.
+4. Push de tag `v1.1.0`.
+
+De GitHub Actions-workflow controleert de tag tegen de manifestversie, gebruikt
+de bijbehorende sectie uit `changes.md` en maakt een release met de titel
+`Korfbal Schedule v1.1.0`. Als Actions niet beschikbaar is, maak je dezelfde
+tag en GitHub Release handmatig aan en gebruik je de matching sectie uit
+`changes.md` als release notes.

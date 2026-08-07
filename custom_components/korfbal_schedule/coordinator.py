@@ -26,6 +26,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .api import MIJN_KORFBAL_API
+
 _LOGGER = logging.getLogger(__name__)
 
 TZ_NL = ZoneInfo("Europe/Amsterdam")
@@ -33,10 +35,6 @@ SCAN_INTERVAL = timedelta(hours=6)
 
 # Sportlink Club.Dataservice base URL
 SPORTLINK_API_BASE = "https://data.sportlink.com"
-
-# Mijn Korfbal REST API (discovered from SPA JS bundle, env.competitionApiV2)
-MIJN_KORFBAL_API = "https://api-mijn.korfbal.nl/api/v2"
-
 
 @dataclass
 class KorfbalMatch:
