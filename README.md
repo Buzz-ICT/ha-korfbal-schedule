@@ -223,7 +223,7 @@ https://mijn.korfbal.nl/team/details/{CLUB_CODE}/{TEAM_CODE}/programma
                                        NCX35C2    T1200100098
 ```
 
-Beide codes zijn zichtbaar in de URL van je teampagina.
+Beide codes zijn zichtbaar in de URL van je teampagina. 
 
 ## Changelog
 
