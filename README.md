@@ -246,7 +246,8 @@ hierboven. Voor versie `1.1.0`:
 3. Voer de lokale validatie uit en commit/push naar `main`.
 4. Push de tag `v1.1.0`.
 
-De GitHub Actions-workflow controleert de tag tegen de manifestversie, gebruikt
+Een push naar `main` voert de validatie uit. Bij een push van een versie-tag
+controleert de GitHub Actions-workflow de tag tegen de manifestversie, gebruikt
 de bijbehorende sectie uit `changes.md` en maakt een release met de titel
 `Korfbal Schedule v1.1.0`. Als Actions niet beschikbaar is, maak je dezelfde
 tag en GitHub Release handmatig aan en gebruik je de matching sectie uit

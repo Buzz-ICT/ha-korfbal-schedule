@@ -1,7 +1,7 @@
 {
   "domain": "korfbal_schedule",
   "name": "Korfbal Schedule",
-  "documentation": "https://github.com/buzzict/ha-korfbal-schedule",
+  "documentation": "https://github.com/rcAlexterneuzen/ha-korfbal-schedule",
   "requirements": [],
   "dependencies": [],
   "codeowners": [],
