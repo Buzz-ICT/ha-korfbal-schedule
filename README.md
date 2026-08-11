@@ -3,6 +3,9 @@
 Haalt het wedstrijdprogramma en uitslagen op van **mijn.korfbal.nl** (KNKV/Sportlink)
 en biedt dit aan als een **Kalender** en **Sensoren** in Home Assistant.
 
+Zie [ARCHITECTURE.md](ARCHITECTURE.md) voor de moduleverdeling en gegevensstroom.
+Pending en uitgebrachte wijzigingen staan in [CHANGES.md](CHANGES.md).
+
 ---
 
 ## Wat doet het?
@@ -227,6 +230,11 @@ Beide codes zijn zichtbaar in de URL van je teampagina.
 
 ## Changelog
 
+### v1.1.2
+
+- Architectuurdocumentatie toegevoegd.
+- Changelog- en releaseverwijzingen gestandaardiseerd voor HACS-packaging.
+
 ### v1.1.1
 
 - Club- en teamkeuze in de browsebare setup hersteld.
@@ -243,18 +251,19 @@ Beide codes zijn zichtbaar in de URL van je teampagina.
 
 ## Releaseprocedure
 
-De versie in `custom_components/korfbal_schedule/manifest.json` is leidend.
-Houd die versie gelijk aan de bovenste versie in `changes.md` en de changelog
-hierboven. Voor versie `1.1.1`:
+De versie in `custom_components/korfbal_schedule/manifest.json` is de leidende
+releaseversie. Zet gewone wijzigingen onder `[Unreleased]` in `CHANGES.md` en
+verhoog de manifestversie pas bij een expliciete versie-bump. Voor een release:
 
-1. Verhoog de manifestversie en voeg release notes toe aan `changes.md`.
-2. Werk de `v1.1.1`-sectie in deze README bij.
-3. Voer de lokale validatie uit en commit/push naar `main`.
+1. Hernoem `[Unreleased]` naar `## [x.y.z] - JJJJ-MM-DD` en voeg daar de
+  release notes aan toe.
+2. Voeg daarboven een nieuwe lege `## [Unreleased]`-sectie toe.
+3. Werk de manifestversie bij en voer de lokale validatie uit.
+4. Push de bijbehorende tag `vX.Y.Z`.
 
-Een succesvolle push naar `main` voert de validatie uit, gebruikt de manifest-
-versie als release-tag, haalt de bijbehorende sectie uit `changes.md` en maakt
-of actualiseert de release met de titel `Korfbal Schedule v1.1.1`. Een aparte
-tag push is dus niet nodig. Bij een expliciete versie-tag controleert de
-workflow de tag tegen de manifestversie en maakt of actualiseert dezelfde
-release. Als Actions niet beschikbaar is, maak je de release handmatig aan
-met de matching sectie uit `changes.md` als release notes.
+Een push naar `main` voert de validatie uit. Alleen een expliciete versie-tag
+die overeenkomt met de manifestversie haalt de bijbehorende sectie uit
+`CHANGES.md` en maakt of actualiseert de GitHub Release. Tag en release-titel
+zijn exact `vX.Y.Z`; de matching changelogsectie wordt als release notes
+gebruikt. Als Actions niet beschikbaar is, gebruik je dezelfde tag, titel en
+release notes handmatig.

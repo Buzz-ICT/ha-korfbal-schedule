@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+## [1.1.2] - 2026-08-11
+
+### Changed
+
+- Added architecture documentation and standardized changelog and release
+  references for HACS packaging.
+
 ## v1.1.1 - 2026-08-07
 
 - Herstel de overgang van clubkeuze naar de teamkeuze in de browsebare setup.
