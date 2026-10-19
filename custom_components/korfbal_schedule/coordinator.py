@@ -5,19 +5,22 @@ Two fetch strategies:
    Endpoint: https://data.sportlink.com/programma
    Docs: https://sportlinkservices.freshdesk.com/nl/support/solutions/articles/9000062942
 
-2. Mijn Korfbal REST API (default, no API key required).
-   Base URL: https://api-mijn.korfbal.nl/api/v2
-   Program:  GET /clubs/{clubCode}/program?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
-   Results:  GET /clubs/{clubCode}/results?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
-   Response: list of week-objects [{year, week, matches: [...]}]
+2. Mijn Korfbal competition API (default).
+   Base URL: https://api-saas-site-prod-236.dotlab.net/general/api/competition
+   Program:  GET /clubs/{clubCode}/program?team={teamCode}&pool={poolCode}
+   Results:  GET /clubs/{clubCode}/results?team={teamCode}&pool={poolCode}
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any
+from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
 import aiohttp
@@ -82,6 +85,7 @@ class KorfbalScheduleCoordinator(DataUpdateCoordinator[list[KorfbalMatch]]):
         self.entry = entry
         self.team_code: str = entry.data["team_code"]
         self.club_code: str = entry.data["club_code"]
+        self.pool_code: str = entry.data.get("pool_code", "")
         self.client_id: str = entry.data.get("sportlink_client_id", "")
         self.team_name: str = entry.data.get("team_name", self.team_code)
 
@@ -167,51 +171,64 @@ class KorfbalScheduleCoordinator(DataUpdateCoordinator[list[KorfbalMatch]]):
             return None
 
     # ------------------------------------------------------------------ #
-    # Strategy 2: Mijn Korfbal REST API (no API key needed)              #
-    # Base: https://api-mijn.korfbal.nl/api/v2                           #
+    # Strategy 2: Mijn Korfbal competition API                           #
+    # Base: https://api-saas-site-prod-236.dotlab.net/general/api/competition
     # ------------------------------------------------------------------ #
     async def _fetch_mijn_korfbal(self, session: aiohttp.ClientSession) -> list[KorfbalMatch]:
-        """Fetch schedule and results from the Mijn Korfbal REST API.
-
-        Endpoints (discovered from SPA JS bundle, env.competitionApiV2):
-          GET /clubs/{clubCode}/program?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
-          GET /clubs/{clubCode}/results?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
-
-        Both return a list of week-objects:
-          [{year, week, matches: [{date, teams, ref_id, pool, facility, status, stats?}]}]
-
-        Matches are filtered client-side by team_code (teams.home.ref_id or
-        teams.away.ref_id).  The club endpoint returns all club teams so
-        client-side filtering is required.
-        """
+        """Fetch the selected team's program and results from Mijn Korfbal."""
         today = date.today()
-        # Cover the full korfball season: Aug previous year → Jul current year
-        date_from = date(today.year - 1, 8, 1).isoformat()
-        date_to = date(today.year + 1, 7, 31).isoformat()
-        params = {"dateFrom": date_from, "dateTo": date_to}
+        # Keep the program limited to the remainder of the current season.
+        program_end = date(today.year + 1, 7, 31).isoformat()
+        pool_params = {"pool": self.pool_code} if self.pool_code else {}
+        common_params = {
+            "dt": "1",
+            "teamDetails": "true",
+            "facility": "true",
+            "officials": "true",
+            "team": self.team_code,
+            **pool_params,
+        }
+        referer_params = {
+            "club": self.club_code,
+            "team": self.team_code,
+            **pool_params,
+        }
+        endpoint_params = {
+            "program": {
+                **common_params,
+                "filters[date]": f"{today.isoformat()}><{program_end}",
+            },
+            "results": {
+                **common_params,
+                "_dateFrom": "2000-01-01",
+                "filters[date]": f"2000-01-01><{today.isoformat()}",
+            },
+        }
 
         headers = {
             "Accept": "application/json",
-            "Referer": f"https://mijn.korfbal.nl/team/details/{self.club_code}/{self.team_code}/programma",
+            "Referer": (
+                "https://mijn.korfbal.nl/competitie-vereniging/?"
+                f"{urlencode(referer_params)}"
+            ),
         }
 
         matches: list[KorfbalMatch] = []
         seen_ids: set[str] = set()
         fetch_errors = 0
 
-        for endpoint in ("program", "results"):
-            url = f"{MIJN_KORFBAL_API}/clubs/{self.club_code}/{endpoint}"
-            _LOGGER.debug("Fetching Mijn Korfbal %s: %s params=%s", endpoint, url, params)
+        for endpoint, params in endpoint_params.items():
             try:
-                async with session.get(
-                    url,
-                    headers=headers,
-                    params=params,
-                    timeout=aiohttp.ClientTimeout(total=15),
-                ) as resp:
-                    resp.raise_for_status()
-                    data = await resp.json(content_type=None)
-            except Exception as err:
+                rows = await self._fetch_mijn_korfbal_endpoint(
+                    session, endpoint, params, headers
+                )
+            except (
+                aiohttp.ClientError,
+                asyncio.TimeoutError,
+                UpdateFailed,
+                ValueError,
+                TypeError,
+            ) as err:
                 _LOGGER.error(
                     "Failed to fetch korfbal %s for club %s: %s",
                     endpoint, self.club_code, err,
@@ -220,14 +237,23 @@ class KorfbalScheduleCoordinator(DataUpdateCoordinator[list[KorfbalMatch]]):
                 continue
 
             is_results = endpoint == "results"
-            week_items = data if isinstance(data, list) else []
-            for week in week_items:
-                for item in week.get("matches", []):
-                    home = item.get("teams", {}).get("home", {})
-                    away = item.get("teams", {}).get("away", {})
-                    # Filter: only keep matches where our team participates
-                    if home.get("ref_id") != self.team_code and away.get("ref_id") != self.team_code:
+            for row in rows:
+                items = row.get("matches", []) if isinstance(row, Mapping) else []
+                if not isinstance(items, list) or not items:
+                    items = [row]
+                for item in items:
+                    if not isinstance(item, Mapping):
+                        raise UpdateFailed(
+                            f"Mijn Korfbal {endpoint} returned an invalid match"
+                        )
+
+                    team_ids = self._match_team_ids(item)
+                    if team_ids and self.team_code not in team_ids:
                         continue
+                    match_pool = self._match_pool_id(item)
+                    if self.pool_code and match_pool and match_pool != self.pool_code:
+                        continue
+
                     match = self._parse_mijn_korfbal_match(item, is_results)
                     if match and match.match_id not in seen_ids:
                         matches.append(match)
@@ -245,83 +271,267 @@ class KorfbalScheduleCoordinator(DataUpdateCoordinator[list[KorfbalMatch]]):
         )
         return matches
 
-    def _parse_mijn_korfbal_match(self, item: dict[str, Any], is_results: bool) -> KorfbalMatch | None:
-        """Parse a single match from the Mijn Korfbal REST API response.
+    async def _fetch_mijn_korfbal_endpoint(
+        self,
+        session: aiohttp.ClientSession,
+        endpoint: str,
+        params: dict[str, str],
+        headers: dict[str, str],
+    ) -> list[Any]:
+        """Fetch all DataTables pages returned by a Mijn Korfbal endpoint."""
+        url = (
+            f"{MIJN_KORFBAL_API}/clubs/"
+            f"{quote(self.club_code, safe='')}/{endpoint}"
+        )
+        page_size = 100
+        start = 0
+        rows: list[Any] = []
 
-        Response shape:
-          {
-            "date": "2026-04-18T09:30:00+0200",
-            "teams": {
-              "home": {"name": "...", "ref_id": "T...", "clubRefId": "..."},
-              "away": {"name": "...", "ref_id": "T...", "clubRefId": "..."}
-            },
-            "ref_id": 54009,
-            "pool": {"name": "...", "ref_id": ...},
-            "facility": {"name": "...", "address": {"city": "..."}},
-            "status": {"game": "gepland", "status": "SCHEDULED"},
-            "stats": {                          # present on results endpoint
-              "home": {"score": 9},
-              "away": {"score": 1}
+        for draw in range(1, 101):
+            request_params = {
+                **params,
+                "draw": str(draw),
+                "start": str(start),
+                "length": str(page_size),
             }
-          }
-        """
+            _LOGGER.debug(
+                "Fetching Mijn Korfbal %s: %s params=%s",
+                endpoint,
+                url,
+                request_params,
+            )
+            async with session.get(
+                url,
+                headers=headers,
+                params=request_params,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as response:
+                response.raise_for_status()
+                data = await response.json(content_type=None)
+
+            if isinstance(data, list):
+                return data
+            if not isinstance(data, Mapping):
+                raise UpdateFailed(
+                    f"Mijn Korfbal {endpoint} returned an invalid response"
+                )
+            if data.get("success") is False:
+                raise UpdateFailed(
+                    f"Mijn Korfbal {endpoint} failed: "
+                    f"{data.get('message', 'unknown API error')}"
+                )
+
+            page_rows = data.get("data")
+            if not isinstance(page_rows, list):
+                raise UpdateFailed(
+                    f"Mijn Korfbal {endpoint} response has no match list"
+                )
+            rows.extend(page_rows)
+
+            total_value = data.get("recordsFiltered", data.get("recordsTotal"))
+            if total_value is None:
+                return rows
+            try:
+                total = int(total_value)
+            except (TypeError, ValueError) as err:
+                raise UpdateFailed(
+                    f"Mijn Korfbal {endpoint} returned an invalid row count"
+                ) from err
+            if not page_rows or start + len(page_rows) >= total:
+                return rows
+            start += len(page_rows)
+
+        raise UpdateFailed(
+            f"Mijn Korfbal {endpoint} exceeded the maximum page count"
+        )
+
+    @staticmethod
+    def _match_team_ids(item: Mapping[str, Any]) -> set[str]:
+        """Collect team IDs when the API includes them in a match row."""
+        teams = item.get("teams")
+        teams = teams if isinstance(teams, Mapping) else {}
+        ids: set[str] = set()
+        for team in (
+            item.get("homeTeam") or teams.get("home"),
+            item.get("awayTeam") or teams.get("away"),
+        ):
+            if not isinstance(team, Mapping):
+                continue
+            for key in ("ref_id", "refId", "teamRefId", "teamId", "id"):
+                value = team.get(key)
+                if value is not None and str(value).strip():
+                    ids.add(str(value).strip())
+                    break
+        return ids
+
+    @staticmethod
+    def _match_pool_id(item: Mapping[str, Any]) -> str:
+        """Return a match's pool ID when it is part of the API row."""
+        pool = item.get("pool")
+        if isinstance(pool, Mapping):
+            value = pool.get("ref_id") or pool.get("refId") or pool.get("id")
+        else:
+            value = pool or item.get("pool_id") or item.get("poolId")
+        return str(value).strip() if value is not None else ""
+
+    def _parse_mijn_korfbal_match(
+        self, item: Mapping[str, Any], is_results: bool
+    ) -> KorfbalMatch | None:
+        """Parse a match row from the current website API or legacy response."""
         try:
-            raw_dt = item.get("date")
+            raw_dt = (
+                item.get("date")
+                or item.get("datetime")
+                or item.get("start")
+                or item.get("date_display")
+            )
             if not raw_dt:
                 return None
 
-            start = datetime.fromisoformat(str(raw_dt)).astimezone(TZ_NL)
+            raw_dt_text = str(raw_dt).strip()
+            raw_time = item.get("time_display") or item.get("time")
+            try:
+                start = datetime.fromisoformat(raw_dt_text.replace("Z", "+00:00"))
+            except ValueError:
+                start = None
+
+            if start is None:
+                start_date = None
+                for date_format in ("%d-%m-%Y", "%Y-%m-%d"):
+                    try:
+                        start_date = datetime.strptime(
+                            raw_dt_text, date_format
+                        ).date()
+                        break
+                    except ValueError:
+                        continue
+                if start_date is None:
+                    return None
+                parsed_time = datetime.strptime(
+                    str(raw_time or "00:00").strip()[:5], "%H:%M"
+                ).time()
+                start = datetime.combine(start_date, parsed_time, tzinfo=TZ_NL)
+            else:
+                if (
+                    start.time().replace(tzinfo=None) == datetime.min.time()
+                    and raw_time
+                ):
+                    parsed_time = datetime.strptime(
+                        str(raw_time).strip()[:5], "%H:%M"
+                    ).time()
+                    start = start.replace(
+                        hour=parsed_time.hour,
+                        minute=parsed_time.minute,
+                    )
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=TZ_NL)
+                start = start.astimezone(TZ_NL)
             end = start + timedelta(hours=1, minutes=30)
 
-            teams = item.get("teams", {})
-            home = teams.get("home", {})
-            away = teams.get("away", {})
+            teams = item.get("teams")
+            teams = teams if isinstance(teams, Mapping) else {}
+            home = item.get("homeTeam") or teams.get("home") or {}
+            away = item.get("awayTeam") or teams.get("away") or {}
+            if not isinstance(home, Mapping) or not isinstance(away, Mapping):
+                return None
 
             facility = item.get("facility") or {}
+            facility = facility if isinstance(facility, Mapping) else {}
             address = facility.get("address") or {}
+            address = address if isinstance(address, Mapping) else {}
             city = address.get("city", "")
-            location = facility.get("name") or city or "Onbekend"
+            location = (
+                item.get("location")
+                or facility.get("name")
+                or item.get("facilityName")
+                or city
+                or "Onbekend"
+            )
+            location = str(location)
             if city and city not in location:
                 location = f"{location}, {city}"
 
-            pool = item.get("pool") or {}
-            competition = pool.get("name", "")
+            pool = item.get("pool")
+            competition = (
+                pool.get("name", "")
+                if isinstance(pool, Mapping)
+                else item.get("competition", "")
+            )
+            competition = competition or item.get("competition", "")
 
             status_obj = item.get("status") or {}
-            status_raw = str(status_obj.get("status", "")).upper()
-            if status_raw in ("CANCELLED", "AFGELAST"):
+            if isinstance(status_obj, Mapping):
+                status_raw = str(
+                    status_obj.get("status") or status_obj.get("game") or ""
+                ).upper()
+            else:
+                status_raw = str(status_obj).upper()
+
+            home_score = self._score_value(
+                home.get("score")
+                if home.get("score") is not None
+                else item.get("home_score")
+            )
+            away_score = self._score_value(
+                away.get("score")
+                if away.get("score") is not None
+                else item.get("away_score")
+            )
+            stats = item.get("stats") or {}
+            if isinstance(stats, Mapping):
+                stat_home = stats.get("home") or {}
+                stat_away = stats.get("away") or {}
+                if isinstance(stat_home, Mapping) and home_score is None:
+                    home_score = self._score_value(stat_home.get("score"))
+                if isinstance(stat_away, Mapping) and away_score is None:
+                    away_score = self._score_value(stat_away.get("score"))
+
+            raw_score = item.get("score")
+            if isinstance(raw_score, str):
+                score_match = re.search(r"(\d+)\s*[-–:]\s*(\d+)", raw_score)
+                if score_match:
+                    home_score = int(score_match.group(1))
+                    away_score = int(score_match.group(2))
+
+            if status_raw in ("CANCELLED", "CANCELED", "AFGELAST"):
                 status = "cancelled"
-            elif status_raw == "FINAL":
+            elif is_results or status_raw in ("FINAL", "PLAYED", "GESPEELD") or (
+                home_score is not None and away_score is not None
+            ):
                 status = "played"
             else:
                 status = "scheduled"
 
-            home_score: int | None = None
-            away_score: int | None = None
-            stats = item.get("stats") or {}
-            if stats:
-                hs = (stats.get("home") or {}).get("score")
-                as_ = (stats.get("away") or {}).get("score")
-                if hs is not None and as_ is not None:
-                    try:
-                        home_score = int(hs)
-                        away_score = int(as_)
-                        status = "played"
-                    except (ValueError, TypeError):
-                        pass
-
+            home_name = home.get("teamName") or home.get("name", "Thuis")
+            away_name = away.get("teamName") or away.get("name", "Uit")
+            match_id = (
+                item.get("ref_id")
+                or item.get("match_id")
+                or item.get("id")
+                or f"{start.isoformat()}-{home_name}-{away_name}"
+            )
             return KorfbalMatch(
-                match_id=str(item.get("ref_id", "")),
-                home_team=home.get("name", "Thuis"),
-                away_team=away.get("name", "Uit"),
+                match_id=str(match_id),
+                home_team=str(home_name),
+                away_team=str(away_name),
                 start=start,
                 end=end,
                 location=location,
-                competition=competition,
+                competition=str(competition),
                 status=status,
                 home_score=home_score,
                 away_score=away_score,
             )
         except (ValueError, KeyError, TypeError, AttributeError) as err:
             _LOGGER.warning("Could not parse Mijn Korfbal match %s: %s", item, err)
+            return None
+
+    @staticmethod
+    def _score_value(value: Any) -> int | None:
+        """Parse an optional API score as an integer."""
+        if value is None or value == "":
+            return None
+        try:
+            return int(value)
+        except (ValueError, TypeError):
             return None

@@ -17,8 +17,8 @@ match model. The calendar and sensor platforms only read coordinator data.
 | --- | --- |
 | `__init__.py` | Defines the domain, creates a coordinator for each config entry, performs the first refresh, and forwards setup to the calendar and sensor platforms. |
 | `api.py` | Fetches and parses clubs and teams for the config flow. It accepts direct, wrapped, and grouped discovery responses and keeps stable API identifiers separate from display labels. |
-| `config_flow.py` | Provides browse and manual setup paths, loads teams after a club is selected, stores stable club/team codes, and prevents duplicate entries. |
-| `coordinator.py` | Selects the configured API strategy, fetches match data, parses responses into `KorfbalMatch`, filters the public club schedule to the selected team, and reports update failures. |
+| `config_flow.py` | Provides browse and manual setup paths, loads teams after a club is selected, stores stable club/team/pool codes, and prevents duplicate entries. |
+| `coordinator.py` | Selects the configured API strategy, fetches match data, parses responses into `KorfbalMatch`, filters to the selected team and pool, and reports update failures. |
 | `calendar.py` | Creates the team calendar and converts normalized matches to Home Assistant calendar events. |
 | `sensor.py` | Creates sensors for the next match, upcoming match count, and latest played result. |
 | `strings.json` | Provides the translated config-flow labels and error messages. |
@@ -31,11 +31,13 @@ match model. The calendar and sensor platforms only read coordinator data.
    labels. The submitted values are the stable club codes.
 3. After a club is selected, browse setup calls
    `GET /clubs/{clubCode}/teams` and displays the matching team options. The
-   submitted value is the stable team code.
+   submitted value is the stable team code; the team's pool ID is also retained
+   for schedule requests.
 4. The settings step collects an optional display name and optional Sportlink
    Client ID.
 5. Manual setup accepts the club and team codes copied from the Mijn Korfbal
-   team URL and remains available when discovery is unavailable.
+   team URL, plus an optional pool ID, and remains available when discovery is
+   unavailable.
 6. The config entry uses `{club_code}_{team_code}` as its unique ID. Existing
    entries therefore remain compatible when labels or discovery behavior
    change.
@@ -50,9 +52,9 @@ When Home Assistant loads a config entry, `__init__.py` creates
 stored in `hass.data[DOMAIN]` and shared with both platforms. It refreshes every
 six hours.
 
-The coordinator reads `club_code`, `team_code`, `team_name`, and the optional
-`sportlink_client_id` from the config entry. It chooses the data source as
-follows:
+The coordinator reads `club_code`, `team_code`, `team_name`, optional
+`pool_code`, and optional `sportlink_client_id` from the config entry. It
+chooses the data source as follows:
 
 ### Sportlink strategy
 
@@ -63,14 +65,16 @@ and cancellation status.
 
 ### Mijn Korfbal strategy
 
-Without a Client ID, the coordinator calls both public endpoints:
+Without a Client ID, the coordinator calls both Mijn Korfbal website endpoints:
 
-- `/clubs/{clubCode}/program`
-- `/clubs/{clubCode}/results`
+- `https://api-saas-site-prod-236.dotlab.net/general/api/competition/clubs/{clubCode}/program`
+- `https://api-saas-site-prod-236.dotlab.net/general/api/competition/clubs/{clubCode}/results`
 
-The date range covers the korfball season. Because the club endpoints return
-matches for every team in the club, the coordinator filters matches by the
-selected team code and deduplicates matches by match ID. Results add scores and
+The coordinator passes the selected team code and, when available, its pool ID
+to each request and reads all DataTables response pages. The program date range
+covers the remainder of the current season; results cover the full history.
+Matches are checked against the selected team and pool when those IDs are
+present in the response, then deduplicated by match ID. Results add scores and
 played status when available. A failure of one endpoint is logged while the
 other endpoint can still provide data; both endpoints failing raises
 `UpdateFailed`.

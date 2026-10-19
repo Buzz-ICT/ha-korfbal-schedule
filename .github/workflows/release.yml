@@ -31,6 +31,7 @@ jobs:
         run: |
           python -m json.tool custom_components/korfbal_schedule/manifest.json >/dev/null
           python -m json.tool custom_components/korfbal_schedule/strings.json >/dev/null
+          python -m json.tool hacs.json >/dev/null
           python -m compileall -q custom_components/korfbal_schedule tests
 
       - name: Read manifest version

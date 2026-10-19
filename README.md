@@ -65,39 +65,41 @@ ook beschikbaar voor teams die niet in de openbare lijst staan.
 
 ### Club- en teamselectie tijdens het instellen
 
-De browsebare setup gebruikt twee openbare endpoints van de Mijn Korfbal-website:
+De browsebare setup gebruikt de openbare competitie-API van Mijn Korfbal:
 
 ```
-GET https://api-mijn.korfbal.nl/api/v2/clubs
-GET https://api-mijn.korfbal.nl/api/v2/clubs/{clubCode}/teams
+GET https://api-saas-site-prod-236.dotlab.net/general/api/competition/clubs
+GET https://api-saas-site-prod-236.dotlab.net/general/api/competition/clubs/{clubCode}/teams
 ```
 
-De clublijst is alfabetisch gegroepeerd en teams zijn per leeftijdsgroep
-gegroepeerd. De integratie toont leesbare labels, maar slaat de stabiele
-`ref_id`-waarden op als `club_code` en `team_code`.
+De integratie toont leesbare teamlabels en slaat de stabiele `ref_id`-waarden
+op als `club_code` en `team_code`. Ook de poule-ID (`pool.ref_id`) wordt
+opgeslagen, zodat programma en uitslagen bij de juiste poule horen.
 
 Deze endpoints zijn website-API's zonder gegarandeerde beschikbaarheid of
 compatibiliteitsbelofte. Een wijziging, lege lijst of tijdelijke storing kan de
 club- of teamkeuze verhinderen; gebruik dan de handmatige route. Bestaande
-configuratie-items blijven werken omdat hun opgeslagen velden en unieke ID niet
-veranderen.
+configuratie-items blijven werken; de poule-ID is optioneel voor bestaande
+items.
 
-### Strategie A: Mijn Korfbal REST API (standaard, geen API key nodig)
+### Strategie A: Mijn Korfbal competitie-API (standaard)
 
 Laat het `sportlink_client_id` veld leeg. De integratie gebruikt dan de
-officiële REST API die de mijn.korfbal.nl website zelf ook gebruikt:
+API die de mijn.korfbal.nl website zelf voor het programma en de uitslagen
+gebruikt:
 
 ```
-GET https://api-mijn.korfbal.nl/api/v2/clubs/{clubCode}/program
-    ?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
+GET https://api-saas-site-prod-236.dotlab.net/general/api/competition/clubs/{clubCode}/program
+    ?dt=1&team={teamCode}&pool={poolCode}&filters[date]={from}><{to}
 
-GET https://api-mijn.korfbal.nl/api/v2/clubs/{clubCode}/results
-    ?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
+GET https://api-saas-site-prod-236.dotlab.net/general/api/competition/clubs/{clubCode}/results
+    ?dt=1&team={teamCode}&pool={poolCode}&_dateFrom=2000-01-01
 ```
 
-Beide endpoints geven een lijst van weekobjecten terug met alle wedstrijden
-van de hele club. De integratie filtert client-side op jouw teamcode.
-Uitslagen (inclusief scores) komen via het results-endpoint.
+De website-API retourneert DataTables-pagina's. De integratie vraagt alle
+pagina's op en stuurt zowel de teamcode als de poule-ID mee. Voor resultaten
+wordt de volledige historie opgevraagd; het programma is beperkt tot de
+resterende speelperiode van het huidige seizoen.
 
 ### Strategie B: Officiële Sportlink Club.Dataservice API
 
@@ -203,8 +205,8 @@ Handmatig vernieuwen: **Instellingen → Apparaten & Diensten → Korfbal Schedu
 | Probleem | Oplossing |
 |---------|-----------|
 | Geen wedstrijden zichtbaar na reload | Doe een **volledige HA herstart** — reload herlaadt geen Python-bestanden. |
-| Club- of teamlijst kan niet worden geladen | Controleer de verbinding met `api-mijn.korfbal.nl` of kies **Codes handmatig invoeren**. |
-| Foutmelding in logs over club/team | Controleer clubcode en teamcode in de URL van jouw teampagina op mijn.korfbal.nl. |
+| Club- of teamlijst kan niet worden geladen | Controleer de verbinding met `api-saas-site-prod-236.dotlab.net` of kies **Codes handmatig invoeren**. |
+| Foutmelding in logs over club/team | Controleer club-, team- en eventueel poule-ID in de URL van jouw teampagina op mijn.korfbal.nl. |
 | `UpdateFailed` in logs | Netwerk probleem of API wijziging. Controleer HA logs via `Instellingen → Systeem → Logboek`. |
 | Kalender leeg, sensoren op `unknown` | Zie logs op `korfbal` — de integratie logt nu altijd een fout als ophalen mislukt. |
 
@@ -221,12 +223,14 @@ logger:
 ## URL-structuur mijn.korfbal.nl
 
 ```
-https://mijn.korfbal.nl/team/details/{CLUB_CODE}/{TEAM_CODE}/programma
-                                       ^^^^^^^^^  ^^^^^^^^^^^^
-                                       NCX35C2    T1200100098
+https://mijn.korfbal.nl/competitie-vereniging/?club={CLUB_CODE}&team={TEAM_CODE}&pool={POOL_ID}
+                                                  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^
+                                                  NCX35C2        T385260525     104892
 ```
 
-Beide codes zijn zichtbaar in de URL van je teampagina. 
+De codes zijn zichtbaar in de URL van je teampagina. De poule-ID is optioneel
+bij handmatige configuratie, maar helpt om exact dezelfde competitie als de
+website te selecteren.
 
 ## Changelog
 

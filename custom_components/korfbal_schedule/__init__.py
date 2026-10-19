@@ -3,8 +3,8 @@
 Scrapes match schedule from mijn.korfbal.nl (Sportlink) and exposes
 upcoming matches as calendar events and sensor attributes.
 
-URL pattern: https://mijn.korfbal.nl/team/details/{CLUB_CODE}/{TEAM_CODE}/programma
-Your team: https://mijn.korfbal.nl/team/details/NCX35C2/T1200100098/programma
+URL pattern: https://mijn.korfbal.nl/competitie-vereniging/?club={CLUB_CODE}&team={TEAM_CODE}&pool={POOL_ID}
+Example: https://mijn.korfbal.nl/competitie-vereniging/?club=NCX35C2&team=T385260525&pool=104892
 """
 
 from __future__ import annotations

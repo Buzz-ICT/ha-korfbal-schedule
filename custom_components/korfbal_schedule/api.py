@@ -12,7 +12,7 @@ from urllib.parse import quote
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
-MIJN_KORFBAL_API = "https://api-mijn.korfbal.nl/api/v2"
+MIJN_KORFBAL_API = "https://api-saas-site-prod-236.dotlab.net/general/api/competition"
 DISCOVERY_TIMEOUT_SECONDS = 15
 
 
@@ -57,6 +57,8 @@ class TeamOption:
     name: str
     label: str
     age_group: str = ""
+    pool_code: str = ""
+    pool_name: str = ""
 
 
 def _first_value(item: Mapping[str, Any], keys: tuple[str, ...]) -> Any:
@@ -265,6 +267,20 @@ def _team_age_group(
     ) or context.get("category") or context.get("group", "")
 
 
+def _team_pool(item: Mapping[str, Any]) -> tuple[str, str]:
+    """Extract the selected team's pool identifier and name."""
+    pool = item.get("pool")
+    if isinstance(pool, Mapping):
+        return _record_code(pool) or "", _record_name(pool) or ""
+
+    code = _first_value(item, ("pool_ref_id", "poolRefId", "pool_code", "poolCode"))
+    name = _first_value(item, ("pool_name", "poolName"))
+    return (
+        str(code).strip() if code is not None else "",
+        str(name).strip() if name is not None else "",
+    )
+
+
 def parse_teams(payload: Any) -> list[TeamOption]:
     """Parse direct or age-grouped team data."""
     validated = _validate_payload(payload)
@@ -278,7 +294,7 @@ def parse_teams(payload: Any) -> list[TeamOption]:
     if not records and validated and not _has_nested_collection(validated):
         raise DiscoveryResponseError("Discovery response contains no team records")
 
-    raw_options: list[tuple[str, str, str]] = []
+    raw_options: list[tuple[str, str, str, str, str]] = []
     seen_codes: set[str] = set()
     for item, context in records:
         code = _record_code(item)
@@ -286,21 +302,25 @@ def parse_teams(payload: Any) -> list[TeamOption]:
         if not code or not name or code in seen_codes:
             continue
         seen_codes.add(code)
-        raw_options.append((code, name, _team_age_group(item, context)))
+        age_group = _team_age_group(item, context)
+        pool_code, pool_name = _team_pool(item)
+        raw_options.append((code, name, age_group, pool_code, pool_name))
 
-    name_counts = Counter(name.casefold() for _code, name, _suffix in raw_options)
+    name_counts = Counter(name.casefold() for _code, name, *_rest in raw_options)
     options = [
         TeamOption(
             code=code,
             name=name,
             label=(
-                _disambiguate_label(name, age_group, code)
+                _disambiguate_label(name, age_group or pool_name, code)
                 if name_counts[name.casefold()] > 1
                 else name
             ),
             age_group=age_group,
+            pool_code=pool_code,
+            pool_name=pool_name,
         )
-        for code, name, age_group in raw_options
+        for code, name, age_group, pool_code, pool_name in raw_options
     ]
     options.sort(key=lambda option: option.label.casefold())
 
@@ -315,6 +335,8 @@ def parse_teams(payload: Any) -> list[TeamOption]:
                 else _disambiguate_label(option.name, "", option.code)
             ),
             age_group=option.age_group,
+            pool_code=option.pool_code,
+            pool_name=option.pool_name,
         )
         for option in options
     ]

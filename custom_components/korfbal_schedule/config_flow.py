@@ -30,11 +30,13 @@ _LOGGER = logging.getLogger(__name__)
 
 CONF_TEAM_CODE = "team_code"
 CONF_CLUB_CODE = "club_code"
+CONF_POOL_CODE = "pool_code"
 CONF_TEAM_NAME = "team_name"
 CONF_SPORTLINK_CLIENT_ID = "sportlink_client_id"
 
 EXAMPLE_TEAM_URL = (
-    "https://mijn.korfbal.nl/team/details/NCX35C2/T1200100098/programma"
+    "https://mijn.korfbal.nl/competitie-vereniging/"
+    "?club=NCX35C2&team=T385260525&pool=104892"
 )
 
 
@@ -50,6 +52,7 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._teams: list[TeamOption] = []
         self._selected_club_code = ""
         self._selected_team_code = ""
+        self._selected_pool_code = ""
         self._selected_team_name = ""
 
     async def async_step_user(
@@ -136,6 +139,7 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self._show_team_form("invalid_selection")
 
             self._selected_team_code = selected_team.code
+            self._selected_pool_code = selected_team.pool_code
             self._selected_team_name = selected_team.name
             return await self.async_step_settings()
 
@@ -159,6 +163,8 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     user_input.get(CONF_SPORTLINK_CLIENT_ID, "")
                 ).strip(),
             }
+            if self._selected_pool_code:
+                data[CONF_POOL_CODE] = self._selected_pool_code
             return await self._async_create_entry(data)
 
         return self.async_show_form(
@@ -182,6 +188,7 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             club_code = str(user_input[CONF_CLUB_CODE]).strip()
             team_code = str(user_input[CONF_TEAM_CODE]).strip()
             team_name = str(user_input.get(CONF_TEAM_NAME, "")).strip() or team_code
+            pool_code = str(user_input.get(CONF_POOL_CODE, "")).strip()
             data = {
                 CONF_CLUB_CODE: club_code,
                 CONF_TEAM_CODE: team_code,
@@ -190,6 +197,8 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     user_input.get(CONF_SPORTLINK_CLIENT_ID, "")
                 ).strip(),
             }
+            if pool_code:
+                data[CONF_POOL_CODE] = pool_code
             return await self._async_create_entry(data)
 
         return self.async_show_form(
@@ -198,6 +207,7 @@ class KorfbalScheduleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_CLUB_CODE): str,
                     vol.Required(CONF_TEAM_CODE): str,
+                    vol.Optional(CONF_POOL_CODE, default=""): str,
                     vol.Optional(CONF_TEAM_NAME, default=""): str,
                     vol.Optional(CONF_SPORTLINK_CLIENT_ID, default=""): str,
                 }

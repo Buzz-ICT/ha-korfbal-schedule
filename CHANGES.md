@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-10-19
+
+### Changed
+
+- Migrate club, team, program, and results requests to the current Mijn Korfbal
+  competition API.
+- Store the selected pool ID and use it when requesting fixtures and results.
+- Parse the current API response format, including paginated match data.
+
+### Added
+
+- Add HACS metadata for the Netherlands integration repository.
+
 ## [1.1.2] - 2026-08-11
 
 ### Changed

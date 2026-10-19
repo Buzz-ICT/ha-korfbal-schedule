@@ -33,10 +33,11 @@
       },
       "manual": {
         "title": "Codes handmatig invoeren",
-        "description": "Voer de club- en teamcode in. Je vindt deze in de URL van de teampagina op mijn.korfbal.nl. Voorbeeld URL: {url}",
+        "description": "Voer de club-, team- en eventueel poulecode in. Je vindt deze in de URL van de teampagina op mijn.korfbal.nl. Voorbeeld URL: {url}",
         "data": {
           "club_code": "Clubcode (bijv. NCX35C2)",
-          "team_code": "Teamcode (bijv. T1200100098)",
+          "team_code": "Teamcode (bijv. T385260525)",
+          "pool_code": "Poule-ID (optioneel, bijv. 104892)",
           "team_name": "Teamnaam (voor weergave)",
           "sportlink_client_id": "Sportlink Client ID (optioneel, voor officiële API)"
         }

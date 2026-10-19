@@ -95,6 +95,74 @@ def test_duplicate_team_names_include_age_group(api) -> None:
     ]
 
 
+def test_current_competition_api_team_records_keep_pool_ids(api) -> None:
+    """Current grouped team responses retain the selected competition pool."""
+    payload = {
+        "success": True,
+        "statusCode": 200,
+        "data": [
+            {
+                "teams": [
+                    {
+                        "name": "KVZ '23 J1",
+                        "ref_id": "T385260525",
+                        "pool": {"name": "Ro-045", "ref_id": 104892},
+                        "sport": {"name": "Zaal Week"},
+                    }
+                ]
+            }
+        ],
+    }
+
+    teams = api.parse_teams(payload)
+
+    assert len(teams) == 1
+    assert teams[0].code == "T385260525"
+    assert teams[0].pool_code == "104892"
+    assert teams[0].pool_name == "Ro-045"
+
+
+@pytest.mark.asyncio
+async def test_discovery_calls_current_competition_endpoints(api, monkeypatch) -> None:
+    """Club and team selection use the endpoints currently used by the site."""
+    responses = iter(
+        [
+            {"success": True, "data": [{"name": "Club", "ref_id": "NCX1"}]},
+            {
+                "success": True,
+                "data": [
+                    {
+                        "teams": [
+                            {
+                                "name": "Team",
+                                "ref_id": "T1",
+                                "pool": {"name": "Poule", "ref_id": 104892},
+                            }
+                        ]
+                    }
+                ],
+            },
+        ]
+    )
+    requested_urls: list[str] = []
+
+    async def fetch_json(_hass, url: str):
+        requested_urls.append(url)
+        return next(responses)
+
+    monkeypatch.setattr(api, "_async_get_json", fetch_json)
+
+    clubs = await api.async_fetch_clubs(None)
+    teams = await api.async_fetch_teams(None, "NCX1")
+
+    assert clubs[0].code == "NCX1"
+    assert teams[0].pool_code == "104892"
+    assert requested_urls == [
+        f"{api.MIJN_KORFBAL_API}/clubs",
+        f"{api.MIJN_KORFBAL_API}/clubs/NCX1/teams",
+    ]
+
+
 def test_empty_responses_are_valid_parser_results(api) -> None:
     """An empty but well-shaped response is distinct from malformed data."""
     assert api.parse_clubs([]) == []

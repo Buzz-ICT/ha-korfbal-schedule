@@ -42,7 +42,11 @@ async def test_browse_flow_preserves_selected_ids_and_custom_name(
     monkeypatch.setattr(
         config_flow,
         "async_fetch_teams",
-        AsyncMock(return_value=[TeamOption("T1", "Team One", "Team One")]),
+        AsyncMock(
+            return_value=[
+                TeamOption("T1", "Team One", "Team One", pool_code="P1")
+            ]
+        ),
     )
 
     menu_result = await hass.config_entries.flow.async_init(
@@ -66,6 +70,7 @@ async def test_browse_flow_preserves_selected_ids_and_custom_name(
     assert create_result["data"] == {
         "club_code": "C1",
         "team_code": "T1",
+        "pool_code": "P1",
         "team_name": "Mijn Team",
         "sportlink_client_id": "",
     }
